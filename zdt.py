@@ -1,6 +1,5 @@
 import serial, time
 from gpiozero import DigitalOutputDevice, Device
-PIN_EN_RS485 = 4 
 
 class MotorError(RuntimeError):
     def __init__(self, reply):
@@ -15,6 +14,7 @@ class ZDTv13():
                            stopbits=serial.STOPBITS_ONE,
                            timeout=3)
 
+        PIN_EN_RS485 = 4 
         if Device.pin_factory:
             v = [v for k,v in Device.pin_factory.pins.items() if v.number==PIN_EN_RS485]
             if v:
@@ -34,7 +34,7 @@ class ZDTv13():
         self.serial.write(cmd)
         return None
 
-    def __send__(self, cmd, note=None, debug=False): 
+    def __send__(self, cmd, note='No Note', debug=False): 
         addr, func = cmd[:2]
         if func == 0xFD:
             self.serial.timeout = None
