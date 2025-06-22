@@ -9,12 +9,11 @@
   * Pinout
   </br><img src="./Docs/pinout.png"></img>
 ### 树莓派进行RS485通讯需要的额外硬件
-* WaveShare RS485 HAT，本质上是一个UART转RS485模块。若使用其CAN功能，则本质上是一个SPI转CAN的模块。
-  </br><img src="./Docs/Pi_RS485_HAT.png"></img>
-* 这款RS485收发模块使用守则是：树莓派GPIO4的电平高低控制RS485的收发，其中高电平后可以借助UART进行Tx，低电平后可以Rx。
+* RS485 TO POE ETH (B)，是一个Ethernet到RS485的透明传输模块。
+  </br><img width="200px" src="Docs/RS485_TO_POE_ETH_B.png"></img>
+* 这款RS485收发模块使用守则是：树莓派通过RJ45网口的Ethernet向IP地址192.168.1.200，端口4196发送TCP消息，则消息被翻译并发送到RS485总线上。
 ### 本驱动程序
 * 本驱动为Python库
-* 树莓派需要依赖GPIO Zero控制GPIO4的电平，需要依赖pySerial与RS385 HAT进行UART通讯。
 ### Usage
 * Clone the repo
   ```sh

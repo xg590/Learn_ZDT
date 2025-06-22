@@ -1,70 +1,40 @@
-import serial, time
-from gpiozero import DigitalOutputDevice, Device
-
+import socket, time
 class MotorError(RuntimeError):
     def __init__(self, reply):
         self.reply = reply
 
-class ZDTv13():
-    def __init__(self, port = '/dev/ttyS0'):
-        self.serial = serial.Serial(port = port, # Change it to 'COM?' in Windows, COM? can be found in Device Manager (Ports)
-                           baudrate = 115200,
-                           bytesize=serial.EIGHTBITS, 
-                           parity=serial.PARITY_NONE, 
-                           stopbits=serial.STOPBITS_ONE,
-                           timeout=3)
+class ZDTv13(object):
+    def __init__(self, ip='192.168.1.200', port=4196, debug=False):
+        self.debug = debug
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.settimeout(3)
+        self.s.connect((ip, port))
 
-        PIN_EN_RS485 = 4 
-        if Device.pin_factory:
-            v = [v for k,v in Device.pin_factory.pins.items() if v.number==PIN_EN_RS485]
-            if v:
-                self.en_485 = v[0].state
-                print(f'[Warning] GPIO {PIN_EN_RS485} is in use')
-            else:
-                self.en_485 = DigitalOutputDevice(pin=PIN_EN_RS485, initial_value=0).value 
-        else:
-            self.en_485 = DigitalOutputDevice(pin=PIN_EN_RS485, initial_value=0).value
-
-    def __read_nbytes__(self, nbytes):
-        self.en_485 = False
-        return self.serial.read(nbytes)
-
-    def __write__(self, cmd):
-        time.sleep(0.1) # make sure the last writing is done and the bus is ready for new writing
-        self.en_485 = True
-        self.serial.write(cmd)
-        return None
-
-    def __send__(self, cmd, note=None, debug=False): 
+    def __comm__(self, cmd, note='No Note', debug=False):
         addr, func = cmd[:2]
-        if func == 0xFD:
-            self.serial.timeout = None
-        else:
-            self.serial.timeout = 3
-            
-        self.__write__(cmd) 
-        reply = self.__read_nbytes__(4)
+        self.s.sendall(cmd)
+        reply = self.s.recv(4)
         if   bytearray([addr, func, 0x02, 0x6B]) == reply:
             print('[Receive] Done') 
-        elif bytearray([addr, 0x00, 0xEE, 0x6B]) == reply: 
-            print('[Receive] Error')
         elif bytearray([addr, func, 0x9F, 0x6B]) == reply:
             print('[Reached]', note) 
         elif bytearray([addr, func, 0xE2, 0x6B]) == reply:
-            print('[Receive] Unable') 
+            print('[Receive] Unable')
+        elif bytearray([addr, 0x00, 0xEE, 0x6B]) == reply: 
+            print('[Receive] Error')
         else:
             if debug: print(f'[Debug]', [hex(i) for i in list(reply)])
-            self.serial.timeout = 1
-            reply = self.__read_nbytes__(40) 
-            self.serial.timeout = 3
+            self.s.settimeout(1)
+            reply = self.__read_nbytes__(999)
+            self.s.settimeout(3)
             raise MotorError(reply)
-    
+
     def __enable__(self, addr=0x02, state='Enable', sync = 0x00):
         addr = addr
         func = 0xF3
         cmd  = bytearray((addr, func, 0xAB, {'Disable':0x00, 'Enable':0x01}[state], sync, 0x6B))
 
-        self.__send__(cmd)
+        self.__comm__(cmd)
     
     def __setID_Addr__(self, old_id=0x01, new_id=0x02):
         addr = old_id
@@ -72,29 +42,29 @@ class ZDTv13():
         save = 0x01
         cmd  = bytearray((addr, func, 0x4B, save, new_id, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
     
     def __goSync__(self, addr=0x02):
         addr = addr
         func = 0xFF
         cmd  = bytearray((addr, func, 0x66, 0x6B))  
         
-        self.__send__(cmd) 
+        self.__comm__(cmd) 
 
     def halt(self, addr=0x02, sync = 0x00):
         addr = addr
         func = 0xFE
         cmd  = bytearray((addr, func, 0x98, sync, 0x6B))
         
-        self.__send__(cmd) 
+        self.__comm__(cmd) 
     
     def getHomingParameters(self, addr=0x02):
         addr = addr
         func = 0x22
         cmd  = bytearray((addr, func, 0x6B))
 
-        self.__write__(cmd)
-        reply = self.__read_nbytes__(18)
+        self.s.sendall(cmd)
+        reply = self.s.recv(18)
         if bytearray([addr, 0x22, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
         else:
@@ -125,15 +95,15 @@ class ZDTv13():
         func = 0x0A
         cmd  = bytearray((addr, func, 0x6D, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def getPulCnt(self, addr = 0x05):
         addr = addr
         func = 0x32
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.__write__(cmd)
-        reply = self.__read_nbytes__(8)
+        self.s.sendall(cmd)
+        reply = self.s.recv(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
             return None, None
@@ -155,15 +125,15 @@ class ZDTv13():
                 }[P_Pul]
         cmd  = bytearray((addr, func, 0x69, save, P_Pul, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def getSettings(self, addr=0x02):
         addr = addr
         func = 0x42 
         cmd  = bytearray((addr, func, 0x6C, 0x6B))   
     
-        self.__write__(cmd)
-        reply = self.__read_nbytes__(33)  # Done  Chcsm
+        self.s.sendall(cmd)
+        reply = self.s.recv(33)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
             return None
@@ -226,8 +196,8 @@ ID 地址（串口通用）        : {ID_Addr}
         func = 0x43
         cmd  = bytearray((addr, func, 0x7A, 0x6B))   
     
-        self.__write__(cmd)
-        reply = self.__read_nbytes__(31)
+        self.s.sendall(cmd)
+        reply = self.s.recv(31)
         assert reply[30] == 0x6B
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
@@ -282,7 +252,7 @@ ID 地址（串口通用）        : {ID_Addr}
         Err_Lmt  = int(30     ).to_bytes(length=2, byteorder='big') # 位置到达窗口 in 0.1° (tenth degree)
         
         cmd  = bytearray((addr, func, 0xD1, save, MotType, P_Pul, P_Serial, En, Dir, MStep, MPlyer, AutoSSD)) + Ma + Ma_Limit + Op_Limit + bytearray((UartBaud, CAN_Baud, ID_Addr, Checksum, Response, Clog_Pro)) + Clog_Rpm + Clog_Ma + Clog_Ms + Err_Lmt + b'\x6B' 
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def setHomingParameters(self, addr=0x02, O_Mode='限位开关回零', O_Dir='CW', O_Vel=30, O_Tmo_Ms = 100_000, O_POT_En='不使能'):
         addr = addr
@@ -301,7 +271,7 @@ ID 地址（串口通用）        : {ID_Addr}
         O_POT_En = {'不使能':0x00, '使能':0x01} [O_POT_En] # 使能上电自动触发回零功能
         cmd  = bytearray([addr, func, 0xAE, save, O_Mode, O_Dir]) + O_Vel + O_Tmo_Ms + O_SL_Rpm + O_SL_Ma + O_SL_Ms + bytearray((O_POT_En, 0x6B)) 
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def setHomingZero(self):
         addr = 0x02
@@ -309,7 +279,7 @@ ID 地址（串口通用）        : {ID_Addr}
         save = 0x01
         cmd  = bytearray((addr, func, 0x88, save, 0x6B)) 
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def homing(self, addr=0x02, O_Mode='限位开关回零', sync=0x00): # 触发回零, 并且所有数值归零。
         addr = addr
@@ -320,29 +290,29 @@ ID 地址（串口通用）        : {ID_Addr}
                     '限位开关回零': 0x03} [O_Mode]  
         cmd  = bytearray((addr, func, O_Mode, sync, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def quitHoming(self, addr=0x02, sync=0x00):
         addr = addr
         func = 0x9C 
         cmd  = bytearray((addr, func, 0x48, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
         
     def deClog(self, addr=0x01):
         addr = addr
         func = 0x0E 
         cmd  = bytearray((addr, func, 0x52, 0x6B))   
     
-        self.__send__(cmd)
+        self.__comm__(cmd)
 
     def getPosition(self, addr = 0x05):
         addr = addr
         func = 0x36
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.__write__(cmd)
-        reply = self.__read_nbytes__(8)
+        self.s.sendall(cmd)
+        reply = self.s.recv(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
         else:
@@ -350,7 +320,7 @@ ID 地址（串口通用）        : {ID_Addr}
             print(Dir, int.from_bytes(reply[3:7]) * 3200 / 0x1_00_00, int.from_bytes(reply[3:7]) ) 
             return Dir, int.from_bytes(reply[3:7]) * 3200 / 0x1_00_00
 
-    def moveByPulseCount(self, addr=0x01, Dir='CW', velo=50, acc=0x01, pul_cnt=0, mode='A', note='No Note', debug=False):
+    def moveByPulseCount(self, addr=0x01, Dir='CW', velo=50, acc=0x01, pul_cnt=0, mode='A', kamikaze=False, note='No Note', debug=False):
         addr = addr
         func = 0xFD
         Dir  = {'CW': 0x00, 'CCW': 0x01} [Dir]
@@ -369,4 +339,15 @@ ID 地址（串口通用）        : {ID_Addr}
         cmd[3: 5] = velo
         cmd[6:10] = pul_cnt
         
-        self.__send__(cmd, note=note, debug=debug)
+        if kamikaze:
+            self.s.settimeout(1)
+            try:
+                self.__comm__(cmd, note=note, debug=debug)
+            except socket.timeout as e:
+                print('kamikaze timeout')
+                pass
+            self.s.settimeout(3)
+        else:
+            self.s.settimeout(None)
+            self.__comm__(cmd, note=note, debug=debug)
+            self.s.settimeout(3)
