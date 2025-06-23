@@ -15,17 +15,17 @@ class ZDTv13(object):
         self.s.sendall(cmd)
         reply = self.s.recv(4)
         if   bytearray([addr, func, 0x02, 0x6B]) == reply:
-            print('[Receive] Done') 
+            print(f'[Receive : {addr}] Done') 
         elif bytearray([addr, func, 0x9F, 0x6B]) == reply:
-            print('[Reached]', note) 
+            print(f'[Reached : {addr}]', note) 
         elif bytearray([addr, func, 0xE2, 0x6B]) == reply:
-            print('[Receive] Unable')
+            print(f'[Receive : {addr}] Unable')
         elif bytearray([addr, 0x00, 0xEE, 0x6B]) == reply: 
-            print('[Receive] Error')
+            print(f'[Receive : {addr}] Error')
         else:
             if debug: print(f'[Debug]', [hex(i) for i in list(reply)])
             self.s.settimeout(1)
-            reply = self.__read_nbytes__(999)
+            reply = self.s.recv(999)
             self.s.settimeout(3)
             raise MotorError(reply)
 
