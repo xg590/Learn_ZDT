@@ -3,17 +3,17 @@ class MotorError(RuntimeError):
     def __init__(self, reply):
         self.reply = reply
 
-class ZDTv13(object):
+class StepperMotor(object):
     def __init__(self, ip='192.168.1.200', port=4196, debug=False):
         self.debug = debug
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.settimeout(3)
-        self.s.connect((ip, port))
+        self.rs485_bus = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.rs485_bus.settimeout(3)
+        self.rs485_bus.connect((ip, port))
 
     def __comm__(self, cmd, note='No Note', debug=False):
         addr, func = cmd[:2]
-        self.s.sendall(cmd)
-        reply = self.s.recv(4)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(4)
         if   bytearray([addr, func, 0x02, 0x6B]) == reply:
             print(f'[Receive : {addr}] Done') 
         elif bytearray([addr, func, 0x9F, 0x6B]) == reply:
@@ -24,9 +24,9 @@ class ZDTv13(object):
             print(f'[Receive : {addr}] Error')
         else:
             if debug: print(f'[Debug]', [hex(i) for i in list(reply)])
-            self.s.settimeout(1)
-            reply = self.s.recv(999)
-            self.s.settimeout(3)
+            self.rs485_bus.settimeout(1)
+            reply = self.rs485_bus.recv(999)
+            self.rs485_bus.settimeout(3)
             raise MotorError(reply)
 
     def __enable__(self, addr=0x02, state='Enable', sync = 0x00):
@@ -63,8 +63,8 @@ class ZDTv13(object):
         func = 0x22
         cmd  = bytearray((addr, func, 0x6B))
 
-        self.s.sendall(cmd)
-        reply = self.s.recv(18)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(18)
         if bytearray([addr, 0x22, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
         else:
@@ -102,8 +102,8 @@ class ZDTv13(object):
         func = 0x32
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.s.sendall(cmd)
-        reply = self.s.recv(8)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
             return None, None
@@ -132,8 +132,8 @@ class ZDTv13(object):
         func = 0x42 
         cmd  = bytearray((addr, func, 0x6C, 0x6B))   
     
-        self.s.sendall(cmd)
-        reply = self.s.recv(33)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(33)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
             return None
@@ -196,8 +196,8 @@ ID 地址（串口通用）        : {ID_Addr}
         func = 0x43
         cmd  = bytearray((addr, func, 0x7A, 0x6B))   
     
-        self.s.sendall(cmd)
-        reply = self.s.recv(31)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(31)
         assert reply[30] == 0x6B
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
@@ -311,8 +311,8 @@ ID 地址（串口通用）        : {ID_Addr}
         func = 0x36
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.s.sendall(cmd)
-        reply = self.s.recv(8)
+        self.rs485_bus.sendall(cmd)
+        reply = self.rs485_bus.recv(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
         else:
@@ -340,14 +340,14 @@ ID 地址（串口通用）        : {ID_Addr}
         cmd[6:10] = pul_cnt
         
         if kamikaze:
-            self.s.settimeout(1)
+            self.rs485_bus.settimeout(1)
             try:
                 self.__comm__(cmd, note=note, debug=debug)
             except socket.timeout as e:
                 print('kamikaze timeout')
                 pass
-            self.s.settimeout(3)
+            self.rs485_bus.settimeout(3)
         else:
-            self.s.settimeout(None)
+            self.rs485_bus.settimeout(None)
             self.__comm__(cmd, note=note, debug=debug)
-            self.s.settimeout(3)
+            self.rs485_bus.settimeout(3)

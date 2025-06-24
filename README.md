@@ -23,8 +23,8 @@
   ```py
   import sys
   sys.path.append('/var/www/html/Learn_ZDT')
-  from zdt import ZDTv13
-  sMot = ZDTv13()
+  from ZDTv13 import StepperMotor
+  sMot = StepperMotor()
   _ , sMot.pul_cnt = sMot.getPulCnt(0x01) 
   sMot.moveByPulseCount(addr=0x01, Dir='CW', velo=500, pul_cnt=6400, mode='A')
   ```
