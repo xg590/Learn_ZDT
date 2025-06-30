@@ -5,15 +5,16 @@ class MotorError(RuntimeError):
 
 class StepperMotor(object):
     def __init__(self, ip='192.168.1.200', port=4196, debug=False):
-        self.debug = debug
         self.rs485_bus = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rs485_bus.settimeout(3)
         self.rs485_bus.connect((ip, port))
+        self.tx = self.rs485_bus.sendall
+        self.rx = self.rs485_bus.recv
 
     def __comm__(self, cmd, note='No Note', debug=False):
         addr, func = cmd[:2]
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(4)
+        self.tx(cmd)
+        reply = self.rx(4)
         if   bytearray([addr, func, 0x02, 0x6B]) == reply:
             print(f'[Receive : {addr}] Done') 
         elif bytearray([addr, func, 0x9F, 0x6B]) == reply:
@@ -25,7 +26,7 @@ class StepperMotor(object):
         else:
             if debug: print(f'[Debug]', [hex(i) for i in list(reply)])
             self.rs485_bus.settimeout(1)
-            reply = self.rs485_bus.recv(999)
+            reply = self.rx(999)
             self.rs485_bus.settimeout(3)
             raise MotorError(reply)
 
@@ -63,8 +64,8 @@ class StepperMotor(object):
         func = 0x22
         cmd  = bytearray((addr, func, 0x6B))
 
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(18)
+        self.tx(cmd)
+        reply = self.rx(18)
         if bytearray([addr, 0x22, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
         else:
@@ -102,8 +103,8 @@ class StepperMotor(object):
         func = 0x32
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(8)
+        self.tx(cmd)
+        reply = self.rx(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
             return None, None
@@ -132,8 +133,8 @@ class StepperMotor(object):
         func = 0x42 
         cmd  = bytearray((addr, func, 0x6C, 0x6B))   
     
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(33)
+        self.tx(cmd)
+        reply = self.rx(33)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
             return None
@@ -196,8 +197,8 @@ ID 地址（串口通用）        : {ID_Addr}
         func = 0x43
         cmd  = bytearray((addr, func, 0x7A, 0x6B))   
     
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(31)
+        self.tx(cmd)
+        reply = self.rx(31)
         assert reply[30] == 0x6B
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply[:4]:
             print('Error')
@@ -311,8 +312,8 @@ ID 地址（串口通用）        : {ID_Addr}
         func = 0x36
         cmd  = bytearray((addr, func, 0x6B))
         
-        self.rs485_bus.sendall(cmd)
-        reply = self.rs485_bus.recv(8)
+        self.tx(cmd)
+        reply = self.rx(8)
         if bytearray([addr, 0x00, 0xEE, 0x6B]) == reply:
             print('Error')
         else:
